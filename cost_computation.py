@@ -9,7 +9,6 @@ def compute_safety_stock(avg_daily_forecast: pd.Series, safety_days: float = 3.0
 def prepare_profit_inputs(
     forecast_summary: pd.DataFrame,
     product_master: pd.DataFrame,
-    transfer_costs: pd.DataFrame,
     safety_days: float = 3.0,
     target_cover_days: float = 7.0
 ) -> pd.DataFrame:
