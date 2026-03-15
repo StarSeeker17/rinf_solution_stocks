@@ -52,35 +52,30 @@ uploaded_file = st.sidebar.file_uploader("Upload sales CSV", type=["csv"])
 def load_sales_data(file):
     if file is not None:
         return pd.read_csv(file)
-    return pd.read_csv("sales_inventory.csv")
+    return pd.read_csv("sales_inventory_10stores_20products.csv")
 
 
 @st.cache_data
-def load_product_master():
-    return pd.DataFrame({
-        "product_id": ["P1", "P2", "P3"],
-        "unit_sale_price": [25, 12, 40],
-        "unit_cost": [15, 7, 26],
-    })
+def load_product_master(file):
+    if file is not None:
+        return pd.read_csv(file)
+    return pd.read_csv("product_master.csv")
 
 
 @st.cache_data
-def load_transfer_costs():
-    return pd.DataFrame({
-        "from_store": ["S1", "S1", "S2", "S2", "S3", "S3"],
-        "to_store":   ["S2", "S3", "S1", "S3", "S1", "S2"],
-        "transport_cost_fixed": [8, 12, 8, 6, 10, 7],
-        "transport_cost_per_unit": [0.5, 0.8, 0.5, 0.4, 0.6, 0.5],
-    })
-
+def load_transfer_costs(file):
+    if file is not None:
+        return pd.read_csv(file)
+    return pd.read_csv("transfer_costs.csv")
 
 try:
     raw_df = load_sales_data(uploaded_file)
-    product_master = load_product_master()
-    transfer_costs = load_transfer_costs()
+    product_master = load_product_master(uploaded_file)
+    transfer_costs = load_transfer_costs(uploaded_file)
 except Exception as e:
     st.error(f"Failed to load input data: {e}")
     st.stop()
+
 
 # -----------------------------
 # Run pipeline

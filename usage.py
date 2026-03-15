@@ -9,7 +9,7 @@ from cost_computation import (
     build_formula_trace_table
 )
 # Load your sales file
-df = pd.read_csv("sales_inventory.csv")
+df = pd.read_csv("sales_inventory_10stores_20products.csv")
 
 # Prepare data
 df = prepare_daily_data(df)
@@ -30,19 +30,9 @@ signals = build_transfer_signal(df, summary, as_of_date="2026-03-15")
 print("\n=== Transfer candidate signals ===")
 print(signals.head(20))
 
-
-transfer_costs = pd.DataFrame({
-    "from_store": ["S1", "S1", "S2", "S2"],
-    "to_store":   ["S2", "S3", "S1", "S3"],
-    "transport_cost_fixed": [8, 12, 8, 6],
-    "transport_cost_per_unit": [0.5, 0.8, 0.5, 0.4]
-})
-
-product_master = pd.DataFrame({
-    "product_id": ["P1", "P2", "P3"],
-    "unit_sale_price": [25, 12, 40],
-    "unit_cost": [15, 7, 26]
-})
+# Load master datasets
+transfer_costs = pd.read_csv("transfer_costs.csv")
+product_master = pd.read_csv("product_master.csv")
 
 profit_inputs = prepare_profit_inputs(
     forecast_summary=summary,
