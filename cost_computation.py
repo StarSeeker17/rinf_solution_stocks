@@ -1,9 +1,25 @@
 import pandas as pd
 import numpy as np
 
+MIN_SAFETY_STOCK = 10.0
 
-def compute_safety_stock(avg_daily_forecast: pd.Series, safety_days: float = 3.0) -> pd.Series:
-    return avg_daily_forecast * safety_days
+def compute_safety_stock(
+    avg_daily_forecast: pd.Series,
+    safety_days: float = 3.0,
+    min_floor: float = MIN_SAFETY_STOCK,
+) -> pd.Series:
+    """
+    Compute safety stock as (avg_daily_forecast * safety_days), with a hard minimum floor.
+
+    Safety stock is a planning buffer:
+    - Transfers are not allowed to reduce stock below this level.
+    - Customer sales can still reduce stock below this level over time.
+    """
+
+    computed_safety = avg_daily_forecast * safety_days
+    return np.maximum(computed_safety, min_floor)
+
+
 
 
 def prepare_profit_inputs(
@@ -39,9 +55,9 @@ def generate_transfer_candidates(
     profit_inputs: pd.DataFrame,
     transfer_costs: pd.DataFrame,
     days_since_last_sale_df: pd.DataFrame = None,
-    stale_days_threshold: int = 10,
-    risk_cost_per_unit: float = 0.0,
-    require_stale_source: bool = False
+    stale_days_threshold: int = 30, # Base this off the UI slider, or default to 30
+    require_stale_source: bool = False,
+    low_qty_threshold: int = 5
 ) -> pd.DataFrame:
     """
     Build all source-destination-product candidate transfers and compute net profit.
@@ -53,23 +69,35 @@ def generate_transfer_candidates(
 
     if days_since_last_sale_df is not None:
         df = df.merge(
-            days_since_last_sale_df[["store_id", "product_id", "days_since_last_sale"]],
+            days_since_last_sale_df[["store_id", "product_id", "days_since_last_sale", "sold_last_30d"]],
             on=["store_id", "product_id"],
             how="left"
         )
     else:
         df["days_since_last_sale"] = np.nan
+        df["sold_last_30d"] = np.nan
 
     # source candidates
     sources = df[df["transferable_units"] > 0].copy()
     if require_stale_source:
-        sources = sources[sources["days_since_last_sale"] >= stale_days_threshold].copy()
+        # ALLOW: Sources that haven't sold OR sold low quantities
+        sources = sources[
+            (sources["days_since_last_sale"] >= stale_days_threshold) |
+            (sources["sold_last_30d"] <= low_qty_threshold)
+        ].copy()
 
     # destination candidates
     destinations = df[df["needed_units"] > 0].copy()
 
     if sources.empty or destinations.empty:
-        return pd.DataFrame()
+        return pd.DataFrame(columns=[
+            "product_id", "source_store", "dest_store", "proposed_qty",
+            "unit_margin", "source_stock", "dest_stock", "source_forecast_7d",
+            "dest_forecast_7d", "source_days_of_cover", "dest_days_of_cover",
+            "source_days_since_last_sale", "transport_cost_fixed", "transport_cost_per_unit",
+            "destination_gain", "source_loss", "transport_cost", "net_profit",
+            "profit_per_unit_transferred"
+        ])
 
     # rename columns for join
     src = sources.rename(columns={
@@ -137,19 +165,17 @@ def generate_transfer_candidates(
         candidates["proposed_qty"] * source_sell_risk_ratio * candidates["unit_margin"]
     )
 
-    # Transport + risk costs
+    # Transport costs
     candidates["transport_cost"] = (
         candidates["transport_cost_fixed"] +
         candidates["proposed_qty"] * candidates["transport_cost_per_unit"]
     )
-    candidates["risk_cost"] = candidates["proposed_qty"] * risk_cost_per_unit
 
     # Net profit
     candidates["net_profit"] = (
         candidates["destination_gain"]
         - candidates["source_loss"]
         - candidates["transport_cost"]
-        - candidates["risk_cost"]
     )
 
     # ROI-like metric
@@ -186,7 +212,6 @@ def generate_transfer_candidates(
         "destination_gain",
         "source_loss",
         "transport_cost",
-        "risk_cost",
         "net_profit",
         "profit_per_unit_transferred"
     ]
@@ -246,12 +271,10 @@ def choose_best_non_conflicting_transfers(candidates: pd.DataFrame) -> pd.DataFr
 
         selected["source_loss"] = qty * source_sell_risk_ratio * row["unit_margin"]
         selected["transport_cost"] = row["transport_cost"]  # fixed already bundled at candidate level
-        selected["risk_cost"] = qty * (row["risk_cost"] / row["proposed_qty"] if row["proposed_qty"] > 0 else 0.0)
         selected["net_profit"] = (
             selected["destination_gain"]
             - selected["source_loss"]
             - selected["transport_cost"]
-            - selected["risk_cost"]
         )
 
         if selected["net_profit"] > 0:
@@ -286,6 +309,9 @@ def build_source_audit_table(
         "days_since_last_sale": "source_days_since_last_sale"
     })
 
+    # Only show stores/products that can actually send stock
+    out = out[out["max_transferable_units"] > 0].copy()
+
     cols = [
         "product_id",
         "source_store",
@@ -314,6 +340,9 @@ def build_destination_audit_table(profit_inputs: pd.DataFrame) -> pd.DataFrame:
         "needed_units": "max_needed_units"
     })
 
+    # Only show stores/products that actually need stock (true destinations)
+    out = out[out["max_needed_units"] > 0].copy()
+
     cols = [
         "product_id",
         "dest_store",
@@ -332,13 +361,12 @@ def build_destination_audit_table(profit_inputs: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_profit_bridge_table(
-    candidates: pd.DataFrame,
-    risk_cost_per_unit: float
+    candidates: pd.DataFrame
 ) -> pd.DataFrame:
+    if candidates.empty:
+        return candidates.copy()
+        
     out = candidates.copy()
-
-    # reconstruct risk cost per unit for visibility
-    out["risk_cost_per_unit"] = risk_cost_per_unit
 
     # derive source sell risk ratio from existing columns
     out["source_sell_risk_ratio"] = np.where(
@@ -354,12 +382,12 @@ def build_profit_bridge_table(
         "dest_store",
         "proposed_qty",
         "unit_margin",
+        "source_forecast_7d",
+        "dest_forecast_7d",
         "destination_gain",
         "source_sell_risk_ratio",
         "source_loss",
         "transport_cost",
-        "risk_cost_per_unit",
-        "risk_cost",
         "net_profit",
         "profit_per_unit_transferred"
     ]
@@ -367,7 +395,10 @@ def build_profit_bridge_table(
     existing_cols = [c for c in cols if c in out.columns]
     return out[existing_cols].sort_values("net_profit", ascending=False)
 
-def build_formula_trace_table(candidates: pd.DataFrame, risk_cost_per_unit: float) -> pd.DataFrame:
+def build_formula_trace_table(candidates: pd.DataFrame) -> pd.DataFrame:
+    if candidates.empty:
+        return pd.DataFrame()
+        
     rows = []
 
     for _, row in candidates.iterrows():
@@ -380,8 +411,7 @@ def build_formula_trace_table(candidates: pd.DataFrame, risk_cost_per_unit: floa
             "destination_gain_formula": f'{row["proposed_qty"]} * {row["unit_margin"]:.3f} = {row["destination_gain"]:.3f}',
             "source_loss_formula": f'{row["proposed_qty"]} * {source_sell_risk_ratio:.3f} * {row["unit_margin"]:.3f} = {row["source_loss"]:.3f}',
             "transport_formula": f'transport = {row["transport_cost"]:.3f}',
-            "risk_formula": f'{row["proposed_qty"]} * {risk_cost_per_unit:.3f} = {row["risk_cost"]:.3f}',
-            "net_profit_formula": f'{row["destination_gain"]:.3f} - {row["source_loss"]:.3f} - {row["transport_cost"]:.3f} - {row["risk_cost"]:.3f} = {row["net_profit"]:.3f}'
+            "net_profit_formula": f'{row["destination_gain"]:.3f} - {row["source_loss"]:.3f} - {row["transport_cost"]:.3f} = {row["net_profit"]:.3f}'
         })
 
     return pd.DataFrame(rows)

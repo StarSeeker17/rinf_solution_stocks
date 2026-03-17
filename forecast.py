@@ -159,8 +159,6 @@ def forecast_next_n_days(df: pd.DataFrame, start_date: str, horizon: int = 7) ->
         .agg(
             forecast_7d=("forecast_units", "sum"),
             avg_daily_forecast=("forecast_units", "mean"),
-            min_daily_forecast=("forecast_units", "min"),
-            max_daily_forecast=("forecast_units", "max"),
             current_stock=("current_stock", "last")
         )
     )
@@ -176,7 +174,7 @@ def forecast_next_n_days(df: pd.DataFrame, start_date: str, horizon: int = 7) ->
 
 def add_last_sale_info(df: pd.DataFrame, as_of_date: str) -> pd.DataFrame:
     """
-    Add days since last sale per (store_id, product_id).
+    Add days since last sale per (store_id, product_id) and quantity sold in last 30 days.
     """
     as_of_date = pd.to_datetime(as_of_date)
     sold = df[df["units_sold"] > 0].copy()
@@ -187,14 +185,35 @@ def add_last_sale_info(df: pd.DataFrame, as_of_date: str) -> pd.DataFrame:
         .rename(columns={"date": "last_sale_date"})
     )
 
+    # Calculate sold in last 30 days
+    last_30d_start = as_of_date - pd.Timedelta(days=30)
+    recent_sales = sold[sold["date"] >= last_30d_start]
+    sold_last_30d = (
+        recent_sales.groupby(["store_id", "product_id"], as_index=False)["units_sold"]
+        .sum()
+        .rename(columns={"units_sold": "sold_last_30d"})
+    )
+
     all_pairs = df[["store_id", "product_id"]].drop_duplicates()
     result = all_pairs.merge(last_sales, on=["store_id", "product_id"], how="left")
+    
+    # If it never sold, it's infinitely stale
     result["days_since_last_sale"] = (as_of_date - result["last_sale_date"]).dt.days
+    result["days_since_last_sale"] = result["days_since_last_sale"].fillna(999)
+    
+    result = result.merge(sold_last_30d, on=["store_id", "product_id"], how="left")
+    result["sold_last_30d"] = result["sold_last_30d"].fillna(0)
 
     return result
+    
 
 
-def build_transfer_signal(df: pd.DataFrame, forecast_summary: pd.DataFrame, as_of_date: str) -> pd.DataFrame:
+def build_transfer_signal(
+    df: pd.DataFrame, 
+    forecast_summary: pd.DataFrame, 
+    as_of_date: str,
+    stale_days_threshold: int = 30
+) -> pd.DataFrame:
     """
     Create a simple signal for inventory transfer candidates.
     This does NOT optimize transfers; it only flags likely excess stock.
@@ -203,10 +222,17 @@ def build_transfer_signal(df: pd.DataFrame, forecast_summary: pd.DataFrame, as_o
 
     out = forecast_summary.merge(last_sale, on=["store_id", "product_id"], how="left")
 
-    out["no_sale_10d_flag"] = (out["days_since_last_sale"] >= 10).astype(int)
-    out["excess_stock_flag"] = ((out["days_of_cover"] > 14) & (out["no_sale_10d_flag"] == 1)).astype(int)
+    # Only flag as stale when there is actual stock that isn't selling (out-of-stock = shortage, not stale)
+    has_stock = out["current_stock"] > 0
+    out["stale_stock_flag"] = (has_stock & (out["days_since_last_sale"] >= stale_days_threshold)).astype(int)
+    # FLAG: Item sold in low quantities (< 5 units in the last 30 days)
+    out["low_quantity_flag"] = (out["sold_last_30d"] < 5).astype(int)
+
+    # Excess = has stock AND (too many days of cover, or stale, or low selling quantity)
+    out["excess_stock_flag"] = (has_stock & ((out["days_of_cover"] > 14) | (out["stale_stock_flag"] == 1) | (out["low_quantity_flag"] == 1))).astype(int)
 
     return out.sort_values(
         ["excess_stock_flag", "days_of_cover", "days_since_last_sale"],
         ascending=[False, False, False]
     )
+    

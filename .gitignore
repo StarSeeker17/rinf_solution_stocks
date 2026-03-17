@@ -1,0 +1,44 @@
+# Byte-compiled / cached
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated CSVs
+*.csv
+
+# Generated / local data (optional: uncomment if you don't want to track these)
+ transfer_analysis.xlsx
+ *.xlsx
+
+# Excel lock files (e.g. when file is open)
+~$*.xlsx
+~$*.xls
+
+# Streamlit
+.streamlit/secrets.toml
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
