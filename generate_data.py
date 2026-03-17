@@ -1,7 +1,6 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 from datetime import datetime, timedelta
-import math
 
 # Configuration
 DAYS = 30
@@ -43,64 +42,64 @@ df_products.to_csv("product_master.csv", index=False)
 stores_data = {
     "Bucuresti (Baneasa)": {"lat": 44.4268, "lon": 26.1025, "multiplier": 2.5}, #High volume
     "Bucuresti (AFI)": {"lat": 44.4300, "lon": 26.0500, "multiplier": 2.0},
-    "Cluj-Napoca": {"lat": 46.7712, "lon": 23.6236, "multiplier": 1.5},
-    "Timisoara": {"lat": 45.7489, "lon": 21.2087, "multiplier": 1.2},
-    "Iasi": {"lat": 47.1585, "lon": 27.6014, "multiplier": 1.1},
-    "Constanta": {"lat": 44.1598, "lon": 28.6348, "multiplier": 1.0},
-    "Brasov": {"lat": 45.6427, "lon": 25.5887, "multiplier": 0.9},
-    "Craiova": {"lat": 44.3302, "lon": 23.7949, "multiplier": 0.8},
-    "Sibiu": {"lat": 45.7983, "lon": 24.1256, "multiplier": 0.6},
-    "Oradea": {"lat": 47.0465, "lon": 21.9189, "multiplier": 0.5}, # Low volume
+    "Cluj-Napoca (Iulius)": {"lat": 46.7712, "lon": 23.6236, "multiplier": 1.5},
+    "Timisoara (Iulius Town)": {"lat": 45.7489, "lon": 21.2087, "multiplier": 1.2},
+    "Iasi (Palas)": {"lat": 47.1585, "lon": 27.6014, "multiplier": 1.1},
+    "Constanta (City Park)": {"lat": 44.1598, "lon": 28.6348, "multiplier": 1.0},
+    "Brasov (AFI)": {"lat": 45.6427, "lon": 25.5887, "multiplier": 0.9},
+    "Craiova (Electroputere)": {"lat": 44.3302, "lon": 23.7949, "multiplier": 0.8},
+    "Sibiu (Promenada)": {"lat": 45.7983, "lon": 24.1256, "multiplier": 0.6},
+    "Oradea (Lotus)": {"lat": 47.0465, "lon": 21.9189, "multiplier": 0.5}, # Low volume
 }
 
 # Real approximate driving distances in km 
 # Matrix format: (City A, City B): distance_in_km
 road_matrix = {
     ("Bucuresti (Baneasa)", "Bucuresti (AFI)"): 12,
-    ("Bucuresti (Baneasa)", "Cluj-Napoca"): 450,
-    ("Bucuresti (Baneasa)", "Timisoara"): 540,
-    ("Bucuresti (Baneasa)", "Iasi"): 390,
-    ("Bucuresti (Baneasa)", "Constanta"): 230,
-    ("Bucuresti (Baneasa)", "Brasov"): 160,
-    ("Bucuresti (Baneasa)", "Craiova"): 240,
-    ("Bucuresti (Baneasa)", "Sibiu"): 270,
-    ("Bucuresti (Baneasa)", "Oradea"): 590,
-    ("Bucuresti (AFI)", "Cluj-Napoca"): 450,
-    ("Bucuresti (AFI)", "Timisoara"): 540,
-    ("Bucuresti (AFI)", "Iasi"): 390,
-    ("Bucuresti (AFI)", "Constanta"): 230,
-    ("Bucuresti (AFI)", "Brasov"): 170,
-    ("Bucuresti (AFI)", "Craiova"): 230,
-    ("Bucuresti (AFI)", "Sibiu"): 270,
-    ("Bucuresti (AFI)", "Oradea"): 590,
-    ("Cluj-Napoca", "Timisoara"): 320,
-    ("Cluj-Napoca", "Iasi"): 390,
-    ("Cluj-Napoca", "Constanta"): 680,
-    ("Cluj-Napoca", "Brasov"): 270,
-    ("Cluj-Napoca", "Craiova"): 400,
-    ("Cluj-Napoca", "Sibiu"): 170,
-    ("Cluj-Napoca", "Oradea"): 150,
-    ("Timisoara", "Iasi"): 690,
-    ("Timisoara", "Constanta"): 760,
-    ("Timisoara", "Brasov"): 410,
-    ("Timisoara", "Craiova"): 330,
-    ("Timisoara", "Sibiu"): 270,
-    ("Timisoara", "Oradea"): 170,
-    ("Iasi", "Constanta"): 430,
-    ("Iasi", "Brasov"): 300,
-    ("Iasi", "Craiova"): 580,
-    ("Iasi", "Sibiu"): 430,
-    ("Iasi", "Oradea"): 530,
-    ("Constanta", "Brasov"): 390,
-    ("Constanta", "Craiova"): 460,
-    ("Constanta", "Sibiu"): 490,
-    ("Constanta", "Oradea"): 810,
-    ("Brasov", "Craiova"): 290,
-    ("Brasov", "Sibiu"): 140,
-    ("Brasov", "Oradea"): 440,
-    ("Craiova", "Sibiu"): 230,
-    ("Craiova", "Oradea"): 470,
-    ("Sibiu", "Oradea"): 310,
+    ("Bucuresti (Baneasa)", "Cluj-Napoca (Iulius)"): 450,
+    ("Bucuresti (Baneasa)", "Timisoara (Iulius Town)"): 540,
+    ("Bucuresti (Baneasa)", "Iasi (Palas)"): 390,
+    ("Bucuresti (Baneasa)", "Constanta (City Park)"): 230,
+    ("Bucuresti (Baneasa)", "Brasov (AFI)"): 160,
+    ("Bucuresti (Baneasa)", "Craiova (Electroputere)"): 240,
+    ("Bucuresti (Baneasa)", "Sibiu (Promenada)"): 270,
+    ("Bucuresti (Baneasa)", "Oradea (Lotus)"): 590,
+    ("Bucuresti (AFI)", "Cluj-Napoca (Iulius)"): 450,
+    ("Bucuresti (AFI)", "Timisoara (Iulius Town)"): 540,
+    ("Bucuresti (AFI)", "Iasi (Palas)"): 390,
+    ("Bucuresti (AFI)", "Constanta (City Park)"): 230,
+    ("Bucuresti (AFI)", "Brasov (AFI)"): 170,
+    ("Bucuresti (AFI)", "Craiova (Electroputere)"): 230,
+    ("Bucuresti (AFI)", "Sibiu (Promenada)"): 270,
+    ("Bucuresti (AFI)", "Oradea (Lotus)"): 590,
+    ("Cluj-Napoca (Iulius)", "Timisoara (Iulius Town)"): 320,
+    ("Cluj-Napoca (Iulius)", "Iasi (Palas)"): 390,
+    ("Cluj-Napoca (Iulius)", "Constanta (City Park)"): 680,
+    ("Cluj-Napoca (Iulius)", "Brasov (AFI)"): 270,
+    ("Cluj-Napoca (Iulius)", "Craiova (Electroputere)"): 400,
+    ("Cluj-Napoca (Iulius)", "Sibiu (Promenada)"): 170,
+    ("Cluj-Napoca (Iulius)", "Oradea (Lotus)"): 150,
+    ("Timisoara (Iulius Town)", "Iasi (Palas)"): 690,
+    ("Timisoara (Iulius Town)", "Constanta (City Park)"): 760,
+    ("Timisoara (Iulius Town)", "Brasov (AFI)"): 410,
+    ("Timisoara (Iulius Town)", "Craiova (Electroputere)"): 330,
+    ("Timisoara (Iulius Town)", "Sibiu (Promenada)"): 270,
+    ("Timisoara (Iulius Town)", "Oradea (Lotus)"): 170,
+    ("Iasi (Palas)", "Constanta (City Park)"): 430,
+    ("Iasi (Palas)", "Brasov (AFI)"): 300,
+    ("Iasi (Palas)", "Craiova (Electroputere)"): 580,
+    ("Iasi (Palas)", "Sibiu (Promenada)"): 430,
+    ("Iasi (Palas)", "Oradea (Lotus)"): 530,
+    ("Constanta (City Park)", "Brasov (AFI)"): 390,
+    ("Constanta (City Park)", "Craiova (Electroputere)"): 460,
+    ("Constanta (City Park)", "Sibiu (Promenada)"): 490,
+    ("Constanta (City Park)", "Oradea (Lotus)"): 810,
+    ("Brasov (AFI)", "Craiova (Electroputere)"): 290,
+    ("Brasov (AFI)", "Sibiu (Promenada)"): 140,
+    ("Brasov (AFI)", "Oradea (Lotus)"): 440,
+    ("Craiova (Electroputere)", "Sibiu (Promenada)"): 230,
+    ("Craiova (Electroputere)", "Oradea (Lotus)"): 470,
+    ("Sibiu (Promenada)", "Oradea (Lotus)"): 310,
 }
 
 def get_driving_distance(city1, city2):
@@ -197,4 +196,4 @@ df_sales = pd.DataFrame(sales_inventory)
 df_sales.to_csv("sales_inventory.csv", index=False)
 
 print("Generated Retail Dataset")
-print("Saved to: product_master.csv, transfer_costs.csv, sales_inventory_10stores_20products.csv")
+print("Saved to: product_master.csv, transfer_costs.csv, sales_inventory.csv")
