@@ -184,8 +184,8 @@ table_formatting = {
     "source_avg_daily_forecast": st.column_config.NumberColumn("Daily Forecast", format="%.2f"),
     "dest_avg_daily_forecast": st.column_config.NumberColumn("Daily Forecast", format="%.2f"),
     "forecast_7d": st.column_config.NumberColumn("7D Forecast", format="%.1f"),
-    "source_forecast_7d": st.column_config.NumberColumn("7D Forecast", format="%.1f"),
-    "dest_forecast_7d": st.column_config.NumberColumn("7D Forecast", format="%.1f"),
+    "source_forecast_7d": st.column_config.NumberColumn("Source 7D Forecast", format="%.1f"),
+    "dest_forecast_7d": st.column_config.NumberColumn("Dest 7D Forecast", format="%.1f"),
     "days_of_cover": st.column_config.NumberColumn("Days of Cover", format="%.1f"),
     "source_days_of_cover": st.column_config.NumberColumn("Days of Cover", format="%.1f"),
     "dest_days_of_cover": st.column_config.NumberColumn("Days of Cover", format="%.1f"),
@@ -216,16 +216,32 @@ table_formatting = {
 # -----------------------------
 # Filters
 # -----------------------------
-st.subheader("Filters")
-
-f1, f2, f3 = st.columns(3)
-
 store_options = sorted(summary["store_id"].dropna().unique().tolist())
 product_options = sorted(summary["product_id"].dropna().unique().tolist())
 
-selected_stores = f1.multiselect("Filter stores", store_options, default=store_options)
-selected_products = f2.multiselect("Filter products", product_options, default=product_options)
-min_profit_filter = f3.number_input("Minimum net profit", min_value=0.0, value=0.0, step=1.0)
+with st.sidebar.expander("Filters", expanded=True):
+    select_all_stores = st.checkbox("All stores", value=True)
+    selected_stores = st.multiselect(
+        "Stores",
+        store_options,
+        default=(store_options if select_all_stores else []),
+        placeholder="Pick one or more stores",
+    )
+
+    select_all_products = st.checkbox("All products", value=True)
+    selected_products = st.multiselect(
+        "Products",
+        product_options,
+        default=(product_options if select_all_products else []),
+        placeholder="Pick one or more products",
+    )
+
+    min_profit_filter = st.number_input(
+        "Minimum net profit (RON)",
+        min_value=0.0,
+        value=0.0,
+        step=1.0,
+    )
 
 def filter_df(dataframe, store_cols=None, product_col="product_id"):
     df_filtered = dataframe.copy()
@@ -496,7 +512,5 @@ with tab6:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
-# -----------------------------
-# Footer explanation
-# -----------------------------
+
 st.markdown("---")
